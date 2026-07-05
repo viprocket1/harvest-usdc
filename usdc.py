@@ -73,7 +73,7 @@ NETWORK_POLL_PROMPTS = 6.0
 SSE_RECONNECT_BACKOFF = 3.0
 LLM_TIMEOUT = 30
 
-__version__ = "1.5.2"
+__version__ = "1.5.3"
 # We use the GitHub API instead of raw.githubusercontent.com because the raw
 # CDN caches stale content for minutes after a push. The API always returns
 # the fresh file. See https://docs.github.com/en/rest/repos/contents
@@ -370,9 +370,20 @@ def make_llm_response(prompt: str) -> str:
         except Exception:
             continue
         if reply and len(reply.strip()) >= 5:
+            # Diagnostic: which backend won? (printed once per prompt)
+            try:
+                with open("/data/data/com.termux/files/home/usdc_llm.log", "a") as f:
+                    f.write(f"{name}\treply={reply[:80]!r}\n")
+            except Exception:
+                pass
             return reply.strip()[:2000]
 
     # 21) fallback — 1 char so it passes the fcoin min length even at 1
+    try:
+        with open("/data/data/com.termux/files/home/usdc_llm.log", "a") as f:
+            f.write(f"FALLBACK\treply=y\n")
+    except Exception:
+        pass
     return "y"
 
 
