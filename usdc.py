@@ -1078,6 +1078,22 @@ def _fetch_remote_source(timeout: float = 15) -> str | None:
         return None
 
 
+def _version_tuple(v: str) -> tuple:
+    """Parse '1.5.3' or '1.5.3-rc1' into (1, 5, 3, 'rc1') for comparison.
+
+    Non-numeric suffixes sort after numeric ones. Returns (0,) for unparseable
+    strings so they sort as 'oldest' (won't be installed).
+    """
+    out = []
+    suffix = ""
+    for part in v.replace("-", ".").split("."):
+        try:
+            out.append(int(part))
+        except ValueError:
+            suffix = part  # e.g. "rc1", "beta2"
+    return tuple(out) + (suffix,)
+
+
 def check_update(timeout: float = 5.0) -> tuple[str, str] | None:
     """Fetch the latest usdc.py from GitHub and return (current_ver, new_ver).
 
@@ -1217,13 +1233,13 @@ def main() -> int:
         result = check_update()
         if result is not None:
             cur, new = result
-            if cur != new:
+            if _version_tuple(new) > _version_tuple(cur):
                 # print to stderr so it shows before the TUI takes over
                 print(f"usdc {cur} -> {new}  (auto-updating...)", file=sys.stderr)
                 ok, msg = do_update()
                 if not ok:
                     print(f"auto-update failed: {msg}  (continuing with {cur})", file=sys.stderr)
-                # do_update() execv's on success, so we only fall through on failure
+            # else: local is at or ahead of remote — do nothing
         # else: network error — quietly continue with current version
 
     return run(args)
