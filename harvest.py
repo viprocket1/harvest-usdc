@@ -154,6 +154,7 @@ class Task:
     submitter: str
     fee_harvest: float
     received_at: float
+    target_agent_id: str = ""   # if set, only this agent may process it
 
 class Inbox:
     def __init__(self, capacity: int = 8):
@@ -595,6 +596,30 @@ class FcoinClient:
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             return {"_err": str(e)[:120]}
 
+    def register_machine(self, machine_specs: str) -> dict:
+        """POST machine specs to /register_machine for the public machine registry."""
+        url = f"{self.base}/register_machine"
+        body = json.dumps({
+            "agent_id": self.agent_id,
+            "machine_specs": machine_specs,
+        }).encode("utf-8")
+        headers = {
+            "X-Agent-ID":   self.agent_id,
+            "Content-Type": "application/json",
+        }
+        req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=NETWORK_TIMEOUT) as r:
+                return json.loads(r.read().decode("utf-8", "replace"))
+        except urllib.error.HTTPError as e:
+            try:
+                detail = e.read().decode("utf-8", "replace")[:200]
+            except Exception:
+                detail = ""
+            return {"_err": f"HTTP {e.code}", "_detail": detail}
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            return {"_err": str(e)[:120]}
+
 
 # ---------- ThreadPool wrapper for non-blocking calls ----------------------
 
@@ -673,12 +698,17 @@ def sse_thread(base: str, agent_id: str, inbox: Inbox, on_event, on_log):
                             if (ev["data"].get("type") == "prompt_request"
                                     or (isinstance(ev["data"], dict) and ev["data"].get("prompt"))):
                                 d = ev["data"]
+                                target = str(d.get("target_agent_id") or "")
+                                # If a target is set, only the matching agent may process it
+                                if target and target != agent_id:
+                                    continue
                                 task = Task(
-                                    id=str(d.get("id", "")),
+                                    id=str(d.get("request_id") or d.get("id", "")),
                                     prompt=str(d.get("prompt", "")),
                                     submitter=str(d.get("submitter", "?")),
-                                    fee_harvest=float(d.get("fee_harvest", 0) or 0),
+                                    fee_harvest=float(d.get("fee_usdc", 0) or 0),
                                     received_at=time.time(),
+                                    target_agent_id=target,
                                 )
                                 if task.id:
                                     inbox.add(task)
@@ -993,6 +1023,20 @@ def run(args: argparse.Namespace) -> int:
         feed.push("info", "no manual input — rig runs unattended")
         t_sse = threading.Thread(target=sse_thread, args=(endpoint_url, agent_id, inbox, on_sse_event, on_sse_log), daemon=True)
         t_sse.start()
+
+        # Register this machine and re-register every 30s so the marketplace
+        # always knows which machines are alive and what their specs are.
+        def heartbeat_loop():
+            specs = get_machine_specs(os.environ.get("HARVEST_LLM_FIRST", "ollama").split()[0])
+            while True:
+                try:
+                    client.register_machine(specs)
+                except Exception:
+                    pass
+                time.sleep(30)
+
+        t_hb = threading.Thread(target=heartbeat_loop, daemon=True)
+        t_hb.start()
     else:
         feed.push("info", "local simulation only (--local)")
 
@@ -1071,6 +1115,10 @@ def run(args: argparse.Namespace) -> int:
                             pid = str(it.get("id", ""))
                             if not pid or pid in last_seen_prompts:
                                 continue
+                            # Skip prompts addressed to a different agent
+                            target = str(it.get("target_agent_id") or "")
+                            if target and target != agent_id:
+                                continue
                             last_seen_prompts.add(pid)
                             task = Task(
                                 id=pid,
@@ -1078,6 +1126,7 @@ def run(args: argparse.Namespace) -> int:
                                 submitter=str(it.get("submitter", "?")),
                                 fee_harvest=float(it.get("fee_harvest", 0) or 0),
                                 received_at=time.time(),
+                                target_agent_id=target,
                             )
                             inbox.add(task)
                             agent.received += 1
@@ -1117,6 +1166,9 @@ def run(args: argparse.Namespace) -> int:
                     if isinstance(ev.get("data"), dict) and ev["data"].get("type") == "prompt_request":
                         agent.received += 1
                         d = ev["data"]
+                        target = str(d.get("target_agent_id") or "")
+                        if target and target != agent_id:
+                            continue   # not addressed to this agent
                         pid = str(d.get("id", ""))
                         if pid and client is not None and pid not in pending_llm:
                             pending_llm[pid] = str(d.get("prompt", ""))
