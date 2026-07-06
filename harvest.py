@@ -255,16 +255,16 @@ def _backend_binary_names() -> list[tuple[str, str]]:
     ]
 
 
-def get_machine_specs(used_backend: str = "") -> dict:
-    """Gather machine/hardware specs as a structured dict.
+def get_machine_specs() -> dict:
+    """Gather machine/hardware specs as a structured dict for the
+    public registry (POST /register_machine).
 
-    Fields: os, hostname, cpu_cores, cpu_model, ram_total, ram_avail,
-    disk, uptime, llm_backend, llm_backends (list of all detected).
+    Fields: hostname, os, cpu_cores, cpu_model, ram_total, ram_avail,
+    disk, uptime, llm_backends (list of all detected LLMs on this rig).
 
-    Returns a dict so it can be:
-      - sent as JSON to /register_machine for the marketplace registry
-      - appended to LLM responses as a formatted text block via
-        format_machine_specs_for_response()
+    Does NOT include a `llm_backend` (single-backend) field — heartbeats
+    have no per-response context. Call `format_response_specs()` for the
+    response-time text block, which can tag the actual backend used.
     """
     fields = {}
 
@@ -314,30 +314,35 @@ def get_machine_specs(used_backend: str = "") -> dict:
         with open("/proc/uptime", "r") as f:
             uptime_seconds = float(f.read().split()[0])
         days = int(uptime_seconds // 86400)
-        hours = int((uptime_seconds % 86400) // 3600)
+        hours = int((uptime_seconds % 3600) // 3600)
         fields["uptime"] = f"{days}d {hours}h"
     except Exception:
         pass
 
-    # ALL detected LLM backends so user can see what's installed
+    # ALL detected LLM backends so user can see what's installed.
+    # The registry never stores a "primary" backend — that's misleading
+    # because heartbeat is a periodic polling signal, not a response.
     backends = detect_llm_backends()
     found = [name for name, found_flag, _ in backends if found_flag]
     fields["llm_backends"] = found
 
-    fields["llm_backend"] = used_backend or ""
-
     return fields
 
 
-def format_machine_specs_for_response(specs: dict) -> str:
-    """Format a machine specs dict into a [MACHINE SPECS] text block."""
+def format_response_specs(used_backend: str = "") -> str:
+    """Format the [MACHINE SPECS] text block appended to every LLM response.
+
+    Unlike get_machine_specs(), this CAN tag the specific backend that
+    answered, because we DO have per-response context at this point.
+    """
+    specs = get_machine_specs()
     parts = ["[MACHINE SPECS]"]
     for k in ("os", "hostname", "cpu_cores", "cpu_model", "ram_total",
               "ram_avail", "disk", "uptime"):
         if k in specs and specs[k]:
             parts.append(f"{k}: {specs[k]}")
-    if specs.get("llm_backend"):
-        parts.append(f"llm_backend: {specs['llm_backend']}")
+    if used_backend:
+        parts.append(f"llm_backend: {used_backend}")
     if specs.get("llm_backends"):
         parts.append(f"llm_backends: {', '.join(specs['llm_backends'])}")
     parts.append("[/MACHINE SPECS]")
@@ -1045,20 +1050,9 @@ def run(args: argparse.Namespace) -> int:
         # always knows which machines are alive and what their specs are.
         def heartbeat_loop():
             while True:
-                # Snapshot the rig's preferred backend AT THIS MOMENT.
-                # Don't lock to a stale choice; reflect what's actually
-                # being used right now.
-                last_used = ""
-                llm_results_seen = getattr(llm, "_results", None)
-                if llm_results_seen is not None:
-                    try:
-                        while True:
-                            _tid, _status, _payload, backend = llm_results_seen.get_nowait()
-                            if backend:
-                                last_used = backend
-                    except Exception:
-                        pass
-                specs = get_machine_specs(last_used)
+                # No per-response context here — heartbeat is just liveness +
+                # a snapshot of the rig's hardware + ALL detected backends.
+                specs = get_machine_specs()
                 try:
                     client.register_machine(specs)
                 except Exception:
@@ -1233,8 +1227,7 @@ def run(args: argparse.Namespace) -> int:
                         inflight_tags.add(tag)
                         # Append machine specs to the response so the server records
                         # hardware provenance alongside the LLM's answer.
-                        specs = get_machine_specs(backend)
-                        specs_text = format_machine_specs_for_response(specs)
+                        specs_text = format_response_specs(backend)
                         enriched_payload = f"{payload}\n\n{specs_text}"
                         http.submit(tag, client.respond_prompt, task_id, enriched_payload, backend)
                 else:
