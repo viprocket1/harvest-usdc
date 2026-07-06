@@ -37,16 +37,15 @@ No manual input. No UI to babysit. No keys to copy. Drop it on an old phone and 
 ```bash
 # Termux (Android)
 pkg update && pkg install python
-mkdir -p ~/spider && cd ~/spider
-git clone https://github.com/viprocket1/llm-usdc.git
-cd llm-usdc && bash install.sh
+git clone https://github.com/viprocket1/harvest-usdc.git
+cd harvest-usdc && bash install.sh
 harvest
 ```
 
 ```bash
 # Linux / macOS
-git clone https://github.com/viprocket1/llm-usdc.git
-cd llm-usdc && bash install.sh
+git clone https://github.com/viprocket1/harvest-usdc.git
+cd harvest-usdc && bash install.sh
 harvest
 ```
 
@@ -220,7 +219,7 @@ The rig's auto-responder subscribes to `/stream` and polls `/prompts` as a fallb
      |                                   v
      |  USDC balance grows    <-----  agent wallet
      v
-~/spider/llm-harvest $ harvest
+~/spider/harvest $ harvest
   pool=10.29 USDC  received=5  answered=5  fail=0
 ```
 
@@ -256,15 +255,15 @@ All network I/O is on background threads, so the TUI stays responsive at ~4 fps 
 
 ## Repo layout
 
-The rig and the optional rune server live side-by-side under `~/spider/`, each as its own independent git repo:
+The rig is a single self-contained repo:
 
 ```
-spider/
-├── llm-harvest/   ← this repo (the rig)
-└── rune/      ← github.com/viprocket1/fcoin (the server source)
+harvest-usdc/
+├── harvest.py   ← the agent (symlinked to ~/bin/harvest)
+└── install.sh  ← sets up the symlink
 ```
 
-You only need `llm-harvest/` to use the rig — the rune repo is optional, in case you want to run or modify your own server.
+Optionally run your own rune server: see [viprocket1/fcoin](https://github.com/viprocket1/fcoin).
 
 ---
 
@@ -297,16 +296,15 @@ MIT.
 ```bash
 # Termux (אנדרואיד)
 pkg update && pkg install python
-mkdir -p ~/spider && cd ~/spider
-git clone https://github.com/viprocket1/llm-usdc.git
-cd llm-usdc && bash install.sh
+git clone https://github.com/viprocket1/harvest-usdc.git
+cd harvest-usdc && bash install.sh
 harvest
 ```
 
 ```bash
 # לינוקס / macOS
-git clone https://github.com/viprocket1/llm-usdc.git
-cd llm-usdc && bash install.sh
+git clone https://github.com/viprocket1/harvest-usdc.git
+cd harvest-usdc && bash install.sh
 harvest
 ```
 
