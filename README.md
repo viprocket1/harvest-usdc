@@ -108,24 +108,24 @@ The rig subscribes to `/stream` (SSE) for instant prompt delivery and polls `/pr
 `install.sh` is also a full lifecycle manager. After installation, `harvest` doubles as the dispatcher for all of these:
 
 ```bash
-harvest install             # re-link ~/bin/harvest, refresh env, print next steps
-harvest uninstall           # remove symlink + ~/.harvest.env + pid/log (keeps the repo)
-harvest update              # git pull + re-link + check for harvest.py self-update
-harvest status              # version, repo path, symlink, env, agent id, endpoint
-harvest doctor              # deps + endpoint reachability + symlink sanity
-harvest agent termux-rig-01 # pin a stable agent id (saved to ~/.harvest.env)
-harvest agent               # show current agent id
-harvest agent --clear       # remove the saved agent id (random per-launch again)
-harvest endpoint <url>      # override the default rune server (saved to ~/.harvest.env)
-harvest endpoint            # show current endpoint
-harvest endpoint --clear    # reset to default
-harvest deps                # (re)install Python deps from requirements.txt
-harvest backends            # list all LLM CLIs and which are detected on this machine
-harvest start               # launch the rig (foreground if tty, background w/ pid file otherwise)
-harvest stop                # kill any running harvest.py
-harvest restart             # stop + start
-harvest logs                # tail the detached-run log
-harvest help                # all subcommands
+harvest install
+harvest uninstall
+harvest update
+harvest status
+harvest doctor
+harvest agent termux-rig-01
+harvest agent
+harvest agent --clear
+harvest endpoint <url>
+harvest endpoint
+harvest endpoint --clear
+harvest deps
+harvest backends
+harvest start
+harvest stop
+harvest restart
+harvest logs
+harvest help
 ```
 
 Re-running `curl ... | bash` is always safe — the installer is idempotent.
@@ -367,24 +367,24 @@ harvest --backends                      # מציג אילו CLI-ים של LLM נ
 `install.sh` הוא גם מנהל מחזור חיים מלא. אחרי ההתקנה, `harvest` משמש גם כמתחבר לכל אלה:
 
 ```bash
-harvest install             # רענון ה-symlink וקובץ הסביבה, הדפסת שלבים הבאים
-harvest uninstall           # הסרת ה-symlink + ~/.harvest.env + pid/log (ה-repo נשמר)
-harvest update              # git pull + רענון ה-symlink + בדיקת עדכון ל-harvest.py
-harvest status              # גרסה, נתיב repo, symlink, סביבה, agent id, endpoint
-harvest doctor              # תלויות + הגעה ל-endpoint + תקינות ה-symlink
-harvest agent termux-rig-01 # נעיצת agent id יציב (נשמר ב-~/.harvest.env)
-harvest agent               # הצגת ה-agent id הנוכחי
-harvest agent --clear       # הסרת ה-agent id השמור (חזרה ל-id אקראי)
-harvest endpoint <url>      # שינוי שרת ברירת המחדל של rune (נשמר ב-~/.harvest.env)
-harvest endpoint            # הצגת ה-endpoint הנוכחי
-harvest endpoint --clear    # איפוס לברירת המחדל
-harvest deps                # התקנה מחדש של תלויות Python מ-requirements.txt
-harvest backends            # רשימת כל ה-CLI-ים של LLM ואילו מהם נמצאו
-harvest start               # הפעלת הריג (בחזית אם tty, ברקע עם pid file אחרת)
-harvest stop                # עצירת כל תהליך harvest.py רץ
-harvest restart             # עצירה + הפעלה
-harvest logs                # tail של יומן ההפעלה ברקע
-harvest help                # כל פקודות המשנה
+harvest install
+harvest uninstall
+harvest update
+harvest status
+harvest doctor
+harvest agent termux-rig-01
+harvest agent
+harvest agent --clear
+harvest endpoint <url>
+harvest endpoint
+harvest endpoint --clear
+harvest deps
+harvest backends
+harvest start
+harvest stop
+harvest restart
+harvest logs
+harvest help
 ```
 
 הרצה חוזרת של `curl ... | bash` תמיד בטוחה — ההתקנה idempotent.
