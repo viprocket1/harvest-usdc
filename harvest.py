@@ -254,12 +254,15 @@ def _backend_binary_names() -> list[tuple[str, str]]:
     ]
 
 
-def get_machine_specs() -> str:
+def get_machine_specs(used_backend: str = "") -> str:
     """Gather machine/hardware specs to append to every LLM response.
 
-    Includes: OS, hostname, architecture, CPU (core count + model if available),
-    RAM total/available, disk total/free, uptime, LLM backends detected.
+    Includes: OS, hostname, CPU (core count + model if available),
+    RAM total/available, disk total/free, uptime.
     Falls back gracefully on any individual field that can't be read.
+
+    `used_backend` is the single backend that answered this request
+    (e.g. "ollama", "claude", "anthropic-api") — only that one is reported.
     """
     parts = ["[MACHINE SPECS]"]
 
@@ -301,16 +304,23 @@ def get_machine_specs() -> str:
     else:
         parts.append("ram: psutil not available")
 
-    # Disk
-    try:
-        du = shutil.disk_usage("/")
-        total_tb = round(du.total / (1024**4), 2)
-        free_tb = round(du.free / (1024**4), 2)
-        parts.append(f"disk_total: {total_tb}TB  disk_free: {free_tb}TB")
-    except Exception:
-        pass
+    # Disk — try multiple paths; Android/Termux "/" often reads as 0
+    disk_reported = False
+    for path in ("/data", "/storage/emulated/0", "."):
+        try:
+            du = shutil.disk_usage(path)
+            total_tb = round(du.total / (1024**4), 2)
+            free_tb = round(du.free / (1024**4), 2)
+            if total_tb > 0:          # skip the Android 0.0TB artefact
+                parts.append(f"disk_total: {total_tb}TB  disk_free: {free_tb}TB")
+                disk_reported = True
+                break
+        except Exception:
+            pass
+    if not disk_reported:
+        parts.append("disk: unavailable on this platform")
 
-    # Uptime
+    # Uptime (Linux/Android)
     try:
         with open("/proc/uptime", "r") as f:
             uptime_seconds = float(f.read().split()[0])
@@ -320,13 +330,11 @@ def get_machine_specs() -> str:
     except Exception:
         pass
 
-    # LLM backends detected
-    backends = detect_llm_backends()
-    found = [name for name, found_flag, _ in backends if found_flag]
-    if found:
-        parts.append(f"llm_backends: {', '.join(found)}")
+    # LLM backend actually used for this response
+    if used_backend:
+        parts.append(f"llm_backend: {used_backend}")
     else:
-        parts.append("llm_backends: none detected")
+        parts.append("llm_backend: unknown")
 
     parts.append("[/MACHINE SPECS]")
     return "\n".join(parts)
@@ -1143,7 +1151,7 @@ def run(args: argparse.Namespace) -> int:
                         inflight_tags.add(tag)
                         # Append machine specs to the response so the server records
                         # hardware provenance alongside the LLM's answer.
-                        specs = get_machine_specs()
+                        specs = get_machine_specs(backend)
                         enriched_payload = f"{payload}\n\n{specs}"
                         http.submit(tag, client.respond_prompt, task_id, enriched_payload, backend)
                 else:
