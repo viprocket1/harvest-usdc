@@ -2,7 +2,7 @@
 
 # harvest
 
-### Autonomous LLM agent for the [fcoin](https://fcoin.onrender.com) prompt marketplace
+### Autonomous LLM agent for the [rune](https://rune.onrender.com) prompt marketplace
 
 **Run one command. Earn USDC for every prompt your local LLM answers.**
 
@@ -19,12 +19,12 @@
 
 ## What is this?
 
-`harvest` is a single-file Python CLI that turns **any device with Python** — your phone, a $5 VPS, a Mac mini — into an autonomous agent on the [fcoin](https://fcoin.onrender.com) prompt marketplace.
+`harvest` is a single-file Python CLI that turns **any device with Python** — your phone, a $5 VPS, a Mac mini — into an autonomous agent on the [rune](https://rune.onrender.com) prompt marketplace.
 
-A user posts a prompt with a USDC fee → fcoin streams it over SSE → `harvest` catches it, hands it to your local LLM, posts the answer back → fcoin credits the fee to your agent wallet.
+A user posts a prompt with a USDC fee → rune streams it over SSE → `harvest` catches it, hands it to your local LLM, posts the answer back → rune credits the fee to your agent wallet.
 
 ```
-   user ──► fcoin ──► harvest ──► your LLM ──► harvest ──► fcoin ──► $USDC
+   user ──► rune ──► harvest ──► your LLM ──► harvest ──► rune ──► $USDC
                          (this repo)   (ollama/codex/...)
 ```
 
@@ -93,8 +93,8 @@ The TUI is monitoring only — there is no input box, no submit key, no manual a
 
 ```bash
 harvest                                 # start the rig (autonomous)
-harvest --agent my-rig                  # use a specific fcoin agent id
-harvest --endpoint https://other:port   # use a different fcoin server
+harvest --agent my-rig                  # use a specific rune agent id
+harvest --endpoint https://other:port   # use a different rune server
 harvest --local                         # run the simulation offline
 harvest --seed 42                       # reproducible sim
 harvest --backends                      # show which LLM CLIs are detected
@@ -129,10 +129,10 @@ Override priority with `USDC_LLM_FIRST=hermes harvest` to put a specific backend
 
 ## Token-priced fees
 
-Submitters can charge per input token, not just per response. fcoin counts the input tokens, locks the total up front, and pays the answering agent the flat fee **plus** the per-token bonus:
+Submitters can charge per input token, not just per response. rune counts the input tokens, locks the total up front, and pays the answering agent the flat fee **plus** the per-token bonus:
 
 ```bash
-curl -X POST https://fcoin.onrender.com/submit_prompt \
+curl -X POST https://rune.onrender.com/submit_prompt \
   -H "Content-Type: application/json" \
   -H "X-Agent-ID: alice" \
   -d '{
@@ -185,12 +185,12 @@ The check is semver-aware: a newer local build is never downgraded by a stale re
 
 ---
 
-## fcoin server endpoints used
+## rune server endpoints used
 
 | Method | Path                       | What it does                          |
 |--------|----------------------------|---------------------------------------|
 | GET    | `/health`                  | liveness check                        |
-| GET    | `/portfolio?agent_id=...`  | agent's USDC + fcoin balance          |
+| GET    | `/portfolio?agent_id=...`  | agent's USDC + rune balance          |
 | GET    | `/prompts?status=...`      | list prompts (open/fulfilled/all)     |
 | GET    | `/prompt/{id}`             | one prompt + its responses           |
 | GET    | `/responses?agent=...`     | audit log of every response           |
@@ -200,7 +200,7 @@ The check is semver-aware: a newer local build is never downgraded by a stale re
 | POST   | `/respond_prompt`          | post a response (the rig's job)       |
 | GET    | `/stream`                  | SSE event stream                      |
 
-The rig's auto-responder subscribes to `/stream` and polls `/prompts` as a fallback. If you want to run the fcoin server yourself, see the [viprocket1/fcoin](https://github.com/viprocket1/fcoin) repo.
+The rig's auto-responder subscribes to `/stream` and polls `/prompts` as a fallback. If you want to run the rune server yourself, see the [viprocket1/fcoin](https://github.com/viprocket1/fcoin) repo.
 
 ---
 
@@ -208,13 +208,13 @@ The rig's auto-responder subscribes to `/stream` and polls `/prompts` as a fallb
 
 ```
 +----------+   POST /submit_prompt    +---------+
-|  user    |  ------------------->   |  fcoin  |  (locks fee + tokens*rate)
+|  user    |  ------------------->   |  rune  |  (locks fee + tokens*rate)
 +----------+                          +---------+
                                           |
                                           |  /stream (SSE) + /prompts
                                           v
 +----------+  POST /respond_prompt   +---------+
-|  rig     |  ------------------->   |  fcoin  |  (pays fee + tokens*rate)
+|  rig     |  ------------------->   |  rune  |  (pays fee + tokens*rate)
 |  (harvest)  |                          +---------+
 +----------+                              |
      |                                   v
@@ -232,14 +232,14 @@ The rig's auto-responder subscribes to `/stream` and polls `/prompts` as a fallb
 harvest.py
 ├── Agent              state from server responses only — no fakes
 │   ├── usdc_balance   (from /portfolio)
-│   ├── fcoin_balance  (from /portfolio)
+│   ├── rune_balance  (from /portfolio)
 │   ├── open_prompts   (from /prompts)
 │   ├── received       (count of prompts detected)
 │   ├── answered       (count of responses accepted)
 │   └── failed         (count of responses rejected)
 ├── Feed               rolling event log
 ├── Inbox              prompts received from the marketplace
-├── FcoinClient        HTTP wrapper for the fcoin REST API
+├── FcoinClient        HTTP wrapper for the rune REST API
 ├── AsyncHTTP          thread-pool wrapper — main loop never blocks
 ├── LLMWorker          thread-pool wrapper for ollama/codex/gemini calls
 ├── sse_thread()       background SSE listener on /stream
@@ -256,15 +256,15 @@ All network I/O is on background threads, so the TUI stays responsive at ~4 fps 
 
 ## Repo layout
 
-The rig and the optional fcoin server live side-by-side under `~/spider/`, each as its own independent git repo:
+The rig and the optional rune server live side-by-side under `~/spider/`, each as its own independent git repo:
 
 ```
 spider/
 ├── llm-harvest/   ← this repo (the rig)
-└── fcoin/      ← github.com/viprocket1/fcoin (the server source)
+└── rune/      ← github.com/viprocket1/fcoin (the server source)
 ```
 
-You only need `llm-harvest/` to use the rig — the fcoin repo is optional, in case you want to run or modify your own server.
+You only need `llm-harvest/` to use the rig — the rune repo is optional, in case you want to run or modify your own server.
 
 ---
 
@@ -276,18 +276,18 @@ MIT.
 
 ## עברית
 
-# harvest — סוכן מענה אוטונומי לשוק הפרומפטים של fcoin
+# harvest — סוכן מענה אוטונומי לשוק הפרומפטים של rune
 
-> מתחבר לשרת fcoin, עונה על פרומפטים של LLM כשהם מגיעים, ואוסף את
+> מתחבר לשרת rune, עונה על פרומפטים של LLM כשהם מגיעים, ואוסף את
 > עמלות ה-USDC. דמון רקע ל-Termux / Linux / macOS.
 
 `harvest` הוא כלי CLI בקובץ Python יחיד שהופך את הטלפון או המחשב שלך לסוכן
-אוטונומי בשוק הפרומפטים של [fcoin](https://fcoin.onrender.com). בכל פעם
+אוטונומי בשוק הפרומפטים של [rune](https://rune.onrender.com). בכל פעם
 שמישהו מפרסם פרומפט עם עמלת USDC, הריג:
 
 1. מזהה את הפרומפט (דרך `/stream` SSE וגם דרך סקר של `/prompts`)
 2. שולח אותו ל-LLM המקומי שלך (ollama → codex → gemini → … → חלופה)
-3. שולח את התשובה בחזרה ל-fcoin דרך `/respond_prompt`
+3. שולח את התשובה בחזרה ל-rune דרך `/respond_prompt`
 4. מזכה את עמלת ה-USDC לארנק הסוכן שלך
 
 בלי קלט ידני. הריג רץ ללא השגחה ומרוויח עמלות על כל תשובה מתקבלת.
@@ -327,7 +327,7 @@ harvest
 ```bash
 harvest                                 # התחל את הריג (אוטונומי)
 harvest --agent my-rig                  # השתמש ב-agent id ספציפי
-harvest --endpoint https://other:port   # השתמש בשרת fcoin אחר
+harvest --endpoint https://other:port   # השתמש בשרת rune אחר
 harvest --local                         # הרץ סימולציה בלי רשת
 harvest --backends                      # מציג אילו CLI-ים של LLM נמצאו במכונה
 ```
@@ -337,13 +337,13 @@ harvest --backends                      # מציג אילו CLI-ים של LLM נ
 
 ## עמלות מבוססות tokens
 
-שרת fcoin תומך בתמחור לפי tokens של קלט, לא רק תשלום קבוע
+שרת rune תומך בתמחור לפי tokens של קלט, לא רק תשלום קבוע
 לכל תגובה. המגיש בוחר `fee_per_input_token_usdc` בזמן ההגשה; השרת
 סופר את ה-tokens של הקלט, נועל את הסכום מראש, ומשלם לסוכן המשיב
 גם את העמלה הקבועה וגם בונוס per-token.
 
 ```bash
-curl -X POST https://fcoin.onrender.com/submit_prompt \
+curl -X POST https://rune.onrender.com/submit_prompt \
   -H "Content-Type: application/json" \
   -H "X-Agent-ID: alice" \
   -d '{
