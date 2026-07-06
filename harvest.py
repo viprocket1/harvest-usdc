@@ -33,7 +33,7 @@ Answering pipeline (first backend that returns a valid reply wins):
  20. OpenAI API        (if OPENAI_API_KEY is set)
 
 Override priority order:  HARVEST_LLM_FIRST=<name>
-Keys:  [p] pause  [u] self-update  [q] quit
+Keys:  [p] pause  [u] self-update  [w] withdraw  [q] quit
 """
 
 import argparse
@@ -481,6 +481,27 @@ class FcoinClient:
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             return {"_err": str(e)[:120]}
 
+    def withdraw(self) -> dict:
+        """Withdraw USDC balance to the agent's configured wallet."""
+        url = f"{self.base}/withdraw"
+        body = json.dumps({"agent_id": self.agent_id}).encode("utf-8")
+        headers = {
+            "X-Agent-ID":   self.agent_id,
+            "Content-Type": "application/json",
+        }
+        req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=NETWORK_TIMEOUT) as r:
+                return json.loads(r.read().decode("utf-8", "replace"))
+        except urllib.error.HTTPError as e:
+            try:
+                detail = e.read().decode("utf-8", "replace")[:200]
+            except Exception:
+                detail = ""
+            return {"_err": f"HTTP {e.code}", "_detail": detail}
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            return {"_err": str(e)[:120]}
+
 
 # ---------- ThreadPool wrapper for non-blocking calls ----------------------
 
@@ -753,6 +774,7 @@ def render(agent: Agent, feed: Feed, inbox: Inbox, endpoint: str, online: bool,
                c(Fore.WHITE, f" harvest {__version__}  keys: ") +
                c(Fore.CYAN, "[p]") + c(Fore.WHITE, " pause  ") +
                c(Fore.CYAN, "[u]") + c(Fore.WHITE, " update  ") +
+               c(Fore.CYAN, "[w]") + c(Fore.WHITE, " withdraw  ") +
                c(Fore.CYAN, "[q]") + c(Fore.WHITE, " quit"))
 
     return "".join(out)
@@ -1070,6 +1092,18 @@ def run(args: argparse.Namespace) -> int:
                 if not ok:
                     print(f"update failed: {msg}")
                     sys.exit(1)
+            elif k in ("w", "W"):
+                if client is None:
+                    feed.push("err", "withdraw: not connected (--local mode)")
+                else:
+                    feed.push("info", "withdrawing USDC...")
+                    sys.stdout.write(render(agent, feed, inbox, endpoint_url, online, cols, rows, paused))
+                    sys.stdout.flush()
+                    res = client.withdraw()
+                    if "_err" in res:
+                        feed.push("err", f"withdraw failed: {res['_err']}")
+                    else:
+                        feed.push("ans", f"withdraw OK — {res}")
 
             time.sleep(0.15)
     finally:
@@ -1212,7 +1246,7 @@ def main() -> int:
         description="Autonomous fcoin prompt-responder rig for Termux. No manual input.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            "keys:  [p] pause   [u] update   [q] quit\n\n"
+            "keys:  [p] pause   [u] update   [w] withdraw   [q] quit\n\n"
             "Runs unattended. Polls fcoin for new prompts, sends each one to your\n"
             "local LLM (ollama → codex → gemini → fallback), and POSTs the reply\n"
             "back to /respond_prompt. Earns USDC for every accepted answer.\n\n"
