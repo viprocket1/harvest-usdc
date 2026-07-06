@@ -593,7 +593,7 @@ class LLMWorker:
 
     def __init__(self, max_workers: int = 2):
         self._pool = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
-        self._results: queue.Queue[tuple[str, str, str]] = queue.Queue()
+        self._results: queue.Queue[tuple[str, str, str, str]] = queue.Queue()
         self._inflight: dict[str, concurrent.futures.Future] = {}
 
     def submit(self, task_id: str, prompt: str):
@@ -614,10 +614,10 @@ class LLMWorker:
 
     def _on_done(self, task_id: str, fut):
         try:
-            status, payload = fut.result()
+            status, payload, backend = fut.result()
         except Exception as e:
-            status, payload = "err", f"{type(e).__name__}: {e}"[:120]
-        self._results.put((task_id, status, payload))
+            status, payload, backend = "err", f"{type(e).__name__}: {e}"[:120], ""
+        self._results.put((task_id, status, payload, backend))
         self._inflight.pop(task_id, None)
 
     def drain(self, sink: list):
